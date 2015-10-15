@@ -1079,12 +1079,12 @@ static __unused NSString *MPURLEncode(NSString *s)
         UILongPressGestureRecognizer *recognizer = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(connectGestureRecognized:)];
         recognizer.minimumPressDuration = 3;
         recognizer.cancelsTouchesInView = NO;
-#if TARGET_IPHONE_SIMULATOR
 #if !TV_OS
+#if TARGET_IPHONE_SIMULATOR
         recognizer.numberOfTouchesRequired = 2;
-#endif
 #else
         recognizer.numberOfTouchesRequired = 4;
+#endif
 #endif
         [[UIApplication sharedApplication].keyWindow addGestureRecognizer:recognizer];
     });
