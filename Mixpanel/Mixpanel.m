@@ -9,8 +9,10 @@
 #include <sys/sysctl.h>
 
 #import <CommonCrypto/CommonDigest.h>
+#if !TV_OS
 #import <CoreTelephony/CTCarrier.h>
 #import <CoreTelephony/CTTelephonyNetworkInfo.h>
+#endif
 #import <SystemConfiguration/SystemConfiguration.h>
 #import <UIKit/UIDevice.h>
 
@@ -26,8 +28,11 @@
 #import "MPDesignerSessionCollection.h"
 #import "MPEventBinding.h"
 #import "MPNotification.h"
+#if !TV_OS
 #import "MPNotificationViewController.h"
 #import "MPSurveyNavigationController.h"
+#endif
+#import "MPSurvey.h"
 #import "MPSwizzler.h"
 #import "MPVariant.h"
 #import "MPWebSocket.h"
@@ -38,8 +43,11 @@
 #define VERSION @"2.8.3"
 
 #if !defined(MIXPANEL_APP_EXTENSION)
+#if !TV_OS
 @interface Mixpanel () <UIAlertViewDelegate, MPSurveyNavigationControllerDelegate, MPNotificationViewControllerDelegate>
-
+#else
+@interface Mixpanel ()
+#endif
 #else
 @interface Mixpanel () <UIAlertViewDelegate>
 
@@ -61,7 +69,9 @@
 @property (nonatomic, assign) UIBackgroundTaskIdentifier taskId;
 @property (nonatomic, strong) dispatch_queue_t serialQueue;
 @property (nonatomic, assign) SCNetworkReachabilityRef reachability;
+#if !TV_OS
 @property (nonatomic, strong) CTTelephonyNetworkInfo *telephonyInfo;
+#endif
 @property (nonatomic, strong) NSDateFormatter *dateFormatter;
 @property (nonatomic, strong) NSMutableDictionary *timedEvents;
 
@@ -158,7 +168,9 @@ static Mixpanel *sharedInstance = nil;
 
         self.distinctId = [self defaultDistinctId];
         self.superProperties = [NSMutableDictionary dictionary];
+#if !TV_OS
         self.telephonyInfo = [[CTTelephonyNetworkInfo alloc] init];
+#endif
         self.automaticProperties = [self collectAutomaticProperties];
         self.eventsQueue = [NSMutableArray array];
         self.peopleQueue = [NSMutableArray array];
@@ -193,9 +205,11 @@ static Mixpanel *sharedInstance = nil;
 #endif
 #endif
 
+#if !TV_OS
         if (launchOptions && launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey]) {
             [self trackPushNotification:launchOptions[UIApplicationLaunchOptionsRemoteNotificationKey] event:@"$app_open"];
         }
+#endif
     }
     return self;
 }
@@ -925,7 +939,11 @@ static __unused NSString *MPURLEncode(NSString *s)
 
 - (NSString *)currentRadio
 {
+#if !TV_OS
     NSString *radio = _telephonyInfo.currentRadioAccessTechnology;
+#else
+    NSString *radio = nil;
+#endif
     if (!radio) {
         radio = @"None";
     } else if ([radio hasPrefix:@"CTRadioAccessTechnology"]) {
@@ -946,13 +964,15 @@ static __unused NSString *MPURLEncode(NSString *s)
     UIDevice *device = [UIDevice currentDevice];
     NSString *deviceModel = [self deviceModel];
     CGSize size = [UIScreen mainScreen].bounds.size;
-    CTCarrier *carrier = [self.telephonyInfo subscriberCellularProvider];
 
     // Use setValue semantics to avoid adding keys where value can be nil.
     [p setValue:[[NSBundle mainBundle] infoDictionary][@"CFBundleVersion"] forKey:@"$app_version"];
     [p setValue:[[NSBundle mainBundle] infoDictionary][@"CFBundleShortVersionString"] forKey:@"$app_release"];
     [p setValue:[self IFA] forKey:@"$ios_ifa"];
+#if !TV_OS
+    CTCarrier *carrier = [self.telephonyInfo subscriberCellularProvider];
     [p setValue:carrier.carrierName forKey:@"$carrier"];
+#endif
     [p setValue:[self watchModel] forKey:@"$watch_model"];
 
     [p addEntriesFromDictionary:@{
@@ -982,7 +1002,9 @@ static __unused NSString *MPURLEncode(NSString *s)
 {
 #if !defined(MIXPANEL_APP_EXTENSION)
     if (_showNetworkActivityIndicator) {
+#if !TV_OS
         [UIApplication sharedApplication].networkActivityIndicatorVisible = on;
+#endif
     }
 #endif
 }
@@ -1017,10 +1039,12 @@ static __unused NSString *MPURLEncode(NSString *s)
 #if __IPHONE_OS_VERSION_MAX_ALLOWED >= 70000
     if (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1) {
         [self setCurrentRadio];
+#if !TV_OS
         [notificationCenter addObserver:self
                                selector:@selector(setCurrentRadio)
                                    name:CTRadioAccessTechnologyDidChangeNotification
                                  object:nil];
+#endif
     }
 #endif
 
@@ -1056,7 +1080,9 @@ static __unused NSString *MPURLEncode(NSString *s)
         recognizer.minimumPressDuration = 3;
         recognizer.cancelsTouchesInView = NO;
 #if TARGET_IPHONE_SIMULATOR
+#if !TV_OS
         recognizer.numberOfTouchesRequired = 2;
+#endif
 #else
         recognizer.numberOfTouchesRequired = 4;
 #endif
@@ -1387,6 +1413,7 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
 
 - (void)presentSurveyWithRootViewController:(MPSurvey *)survey
 {
+#if !TV_OS
     UIViewController *presentingViewController = [Mixpanel topPresentedViewController];
 
     // This fixes the NSInternalInconsistencyException caused when we try present a
@@ -1400,6 +1427,7 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
         controller.backgroundImage = [presentingViewController.view mp_snapshotImage];
         [presentingViewController presentViewController:controller animated:YES completion:nil];
     }
+#endif
 }
 
 - (void)showSurveyWithObject:(MPSurvey *)survey withAlert:(BOOL)showAlert
@@ -1429,12 +1457,14 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
                         }]];
                         [[Mixpanel topPresentedViewController] presentViewController:alert animated:YES completion:nil];
                     } else {
+#if !TV_OS
                         UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"We'd love your feedback!"
                                                                         message:@"Mind taking a quick survey?"
                                                                        delegate:self
                                                               cancelButtonTitle:@"No, Thanks"
                                                               otherButtonTitles:@"Sure", nil];
                         [alert show];
+#endif
                     }
 #else
                     UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"We'd love your feedback!"
@@ -1495,6 +1525,8 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
     }
 }
 
+#if !TV_OS
+
 - (void)surveyController:(MPSurveyNavigationController *)controller wasDismissedWithAnswers:(NSArray *)answers
 {
     [controller.presentingViewController dismissViewControllerAnimated:YES completion:nil];
@@ -1528,6 +1560,8 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
         }
     }
 }
+
+#endif
 
 #pragma mark - Mixpanel Notifications
 
@@ -1601,6 +1635,7 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
 
 - (BOOL)showTakeoverNotificationWithObject:(MPNotification *)notification
 {
+#if !TV_OS
     UIViewController *presentingViewController = [Mixpanel topPresentedViewController];
 
     if (![presentingViewController isBeingPresented] && ![presentingViewController isBeingDismissed]) {
@@ -1617,10 +1652,14 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
     } else {
         return NO;
     }
+#else
+    return NO;
+#endif
 }
 
 - (BOOL)showMiniNotificationWithObject:(MPNotification *)notification
 {
+#if !TV_OS
     MPMiniNotificationViewController *controller = [[MPMiniNotificationViewController alloc] init];
     controller.notification = notification;
     controller.delegate = self;
@@ -1633,7 +1672,12 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
         [self notificationController:controller wasDismissedWithStatus:NO];
     });
     return YES;
+#else
+    return NO;
+#endif
 }
+
+#if !TV_OS
 
 - (void)notificationController:(MPNotificationViewController *)controller wasDismissedWithStatus:(BOOL)status
 {
@@ -1661,6 +1705,8 @@ static void MixpanelReachabilityCallback(SCNetworkReachabilityRef target, SCNetw
         [controller hideWithAnimation:YES completion:completionBlock];
     }
 }
+
+#endif
 
 - (void)trackNotification:(MPNotification *)notification event:(NSString *)event
 {
